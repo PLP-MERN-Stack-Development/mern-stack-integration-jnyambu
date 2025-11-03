@@ -1,78 +1,67 @@
-// server.js - Main server file for the MERN blog application
+const dotenv = require('dotenv');
+dotenv.config(); 
 
-// Import required modules
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
-const dotenv = require('dotenv');
-const path = require('path');
+require('express-async-errors'); 
 
-// Import routes
-const postRoutes = require('./routes/posts');
-const categoryRoutes = require('./routes/categories');
-const authRoutes = require('./routes/auth');
+const errorHandler = require('./middleware/errorHandler');
 
-// Load environment variables
-dotenv.config();
-
-// Initialize Express app
 const app = express();
-const PORT = process.env.PORT || 5000;
 
 // Middleware
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Serve uploaded files
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+// Get MONGO_URI from environment
+const MONGO_URI = process.env.MONGO_URI;
 
-// Log requests in development mode
-if (process.env.NODE_ENV === 'development') {
-  app.use((req, res, next) => {
-    console.log(`${req.method} ${req.url}`);
-    next();
-  });
+// Check if MONGO_URI exists
+if (!MONGO_URI) {
+  console.error('❌ Error: MONGO_URI is not defined in .env file');
+  process.exit(1);
 }
 
-// API routes
-app.use('/api/posts', postRoutes);
-app.use('/api/categories', categoryRoutes);
-app.use('/api/auth', authRoutes);
-
-// Root route
-app.get('/', (req, res) => {
-  res.send('MERN Blog API is running');
-});
-
-// Error handling middleware
-app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(err.statusCode || 500).json({
-    success: false,
-    error: err.message || 'Server Error',
-  });
-});
-
-// Connect to MongoDB and start server
-mongoose
-  .connect(process.env.MONGODB_URI)
-  .then(() => {
-    console.log('Connected to MongoDB');
-    app.listen(PORT, () => {
-      console.log(`Server running on port ${PORT}`);
-    });
-  })
+// Connect to MongoDB
+mongoose.connect(MONGO_URI)
+  .then(() => console.log('✅ MongoDB Atlas Connected'))
   .catch((err) => {
-    console.error('Failed to connect to MongoDB', err);
+    console.error('❌ MongoDB connection error:', err);
     process.exit(1);
   });
 
-// Handle unhandled promise rejections
-process.on('unhandledRejection', (err) => {
-  console.error('Unhandled Promise Rejection:', err);
-  // Close server & exit process
-  process.exit(1);
+// Test Route 
+app.get('/', (req, res) => {
+  res.json({ 
+    message: 'MERN Blog API is running!',
+    status: 'success'
+  });
 });
 
-module.exports = app; 
+//  debug code
+app.use((req, res, next) => {
+  console.log(`${req.method} ${req.path}`);
+  next();
+});
+
+
+// ROUTES
+const postRoutes = require('./routes/post');
+const categoriesRoutes = require('./routes/categories');
+const authRoutes = require('./routes/auth');
+
+console.log("Existing routes folder files:", require('fs').readdirSync('./routes'));
+
+// Use routes
+app.use('/api/posts', postRoutes);
+app.use('/api/categories', categoriesRoutes);
+app.use('/api/auth', authRoutes);
+
+// Error handling middleware 
+app.use(errorHandler);
+
+// Start the server
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
